@@ -7,11 +7,11 @@ import Avro._
 class UserAvroTest extends AnyWordSpecLike with Matchers {
 
   "Avro.encode[User]" should {
-     "encode User in Avro format with schema v1 and decode with v1" in {
-       val naree = UserWithCountry("naree", 1, "Singa")
+    "encode User in Avro format with schema v1 and decode with v1" in {
+      val naree = UserWithCountry("naree", 1, "Singa")
 
-       decode[UserWithCountry](encode(naree)) shouldBe naree
-     }
+      decode[UserWithCountry](encode(naree)) shouldBe naree
+    }
 
     "encode User in Avro format with schema v1 and decode with v2" in {
       val naree = UserWithCountry("naree", 1, "Singa")
