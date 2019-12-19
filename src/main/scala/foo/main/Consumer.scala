@@ -8,7 +8,7 @@ object Consumer extends IOApp {
     import Config.kafka._
     val consumerGroup = "test-consumer-group"
 
-    Kafka.consumer[UserWithRegion](consumerGroup, topic, broker).unsafeRunSync()
+    Kafka.consumer[IO, UserWithRegion](consumerGroup, topic, broker).unsafeRunSync()
     IO(ExitCode.Success)
   }
 }

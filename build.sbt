@@ -7,6 +7,8 @@ libraryDependencies ++= Seq(
   "com.sksamuel.avro4s" %% "avro4s-core" % "1.8.4", // using an old version that is compatible with mu libs
   "io.higherkindness" %% "mu-rpc-fs2" % "0.19.1", // required for imports & annotations in the generated code
   "io.chrisdavenport" %% "log4cats-slf4j" % "1.0.1",
+  "io.chrisdavenport" %% "log4cats-core"  % "1.0.1",
+  "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.scalatest" %% "scalatest" % "3.1.0" % "test"
 )
 
