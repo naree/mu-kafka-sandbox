@@ -16,25 +16,26 @@ object Kafka {
   implicit def unsafeLogger[F[_] : Sync] = Slf4jLogger.getLogger[F]
 
   object producer {
-    def settings[F[_]](broker: String)(implicit sync: Sync[F]): ProducerSettings[F, String, Array[Byte]] = ProducerSettings[F, String, Array[Byte]]
-      .withBootstrapServers(broker)
+    def settings[F[_]](broker: String)(implicit sync: Sync[F]): ProducerSettings[F, String, Array[Byte]] =
+      ProducerSettings[F, String, Array[Byte]]
+        .withBootstrapServers(broker)
 
     def pipe[F[_]](broker: String)(implicit contextShift: ContextShift[F],
                                    concurrentEffect: ConcurrentEffect[F], sync: Sync[F]):
     Pipe[F, ProducerRecords[String, Array[Byte], Unit], ProducerResult[String, Array[Byte], Unit]] =
       produce(settings(broker))
 
-    def apply[F[_], A: SchemaFor : ToRecord : FromRecord]
-    (broker: String, topic: String, messageQueue: Stream[F, Queue[F, A]], users: Stream[F, A])
-    (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F], timer: Timer[F]): F[Unit] =
+    def apply[F[_], A: SchemaFor : ToRecord : FromRecord](broker: String, topic: String, messageQueue: Stream[F, Queue[F, A]], users: Stream[F, A])
+                                                         (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F],
+                                                          timer: Timer[F]): F[Unit] =
       (for {
         queue <- messageQueue
         _ <- Stream.sleep_[F](5.seconds) concurrently producerStreamWithInputQueue(broker, topic, users, queue).drain
       } yield ()).compile.drain
 
-    def producerStreamWithInputQueue[F[_], A: SchemaFor : ToRecord : FromRecord]
-    (broker: String, topic: String, users: Stream[F, A], queue: Queue[F, A])
-    (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F], timer: Timer[F], sync: Sync[F]): Stream[F, Any] =
+    def producerStreamWithInputQueue[F[_], A: SchemaFor : ToRecord : FromRecord](broker: String, topic: String, users: Stream[F, A], queue: Queue[F, A])
+                                                                                (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F],
+                                                                                 timer: Timer[F], sync: Sync[F]): Stream[F, Any] =
       Stream(
         users.through(queue.enqueue),
         queue.dequeue
