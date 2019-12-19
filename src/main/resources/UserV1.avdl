@@ -1,0 +1,9 @@
+@namespace("foo")
+
+protocol UserV1 {
+  record UserWithCountry {
+    string name;
+    int age;
+    string country;
+  }
+}
