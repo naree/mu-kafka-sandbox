@@ -30,11 +30,11 @@ object Kafka {
                                                           timer: Timer[F]): F[Unit] =
       (for {
         queue <- messageQueue
-        _ <- Stream.sleep_[F](5.seconds) concurrently producerStreamWithInputQueue(broker, topic, users, queue).drain
+        _ <- Stream.sleep_[F](5.seconds) concurrently streamWithQueue(broker, topic, users, queue).drain
       } yield ()).compile.drain
 
-    def producerStreamWithInputQueue[F[_], A: SchemaFor : ToRecord : FromRecord](broker: String, topic: String, users: Stream[F, A], queue: Queue[F, A])
-                                                                                (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F],
+    def streamWithQueue[F[_], A: SchemaFor : ToRecord : FromRecord](broker: String, topic: String, users: Stream[F, A], queue: Queue[F, A])
+                                                                   (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F],
                                                                                  timer: Timer[F], sync: Sync[F]): Stream[F, Any] =
       Stream(
         users.through(queue.enqueue),

@@ -6,4 +6,6 @@ protocol UserV1 {
     int age;
     string country;
   }
+
+  UserWithCountry sendUser(UserWithCountry user);
 }
