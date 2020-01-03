@@ -21,7 +21,9 @@ class KafkaTest extends AnyFlatSpec with Matchers {
 
     val messageQueue: Queue[IO, Option[UserWithCountry]] = Queue.bounded[IO, Option[UserWithCountry]](1).
       unsafeRunSync()
-    val users: Stream[IO, Option[UserWithCountry]] = Stream(Some(UserWithCountry("naree", 1, "singapore")), None)
+    val naree = UserWithCountry("naree", 1, "singapore")
+
+    val users: Stream[IO, Option[UserWithCountry]] = Stream(Some(naree), None)
 
     val recordMetadata = new RecordMetadata(new TopicPartition("", 1), 0, 0,
       0, 0l, 0, 0)
@@ -34,6 +36,8 @@ class KafkaTest extends AnyFlatSpec with Matchers {
     val kafkaProducerStream = Kafka.producer
       .streamWithQueue(publishToKafkaMock)("topic1", users, messageQueue)
 
-    kafkaProducerStream.compile.toList.unsafeRunSync()
+    val results = kafkaProducerStream.compile.toList.unsafeRunSync()
+    println(results)
+    Avro.decode[UserWithCountry](results(2).asInstanceOf[ProducerResult[String, Array[Byte], Unit]].records.head.get._1.value) shouldBe naree
   }
 }

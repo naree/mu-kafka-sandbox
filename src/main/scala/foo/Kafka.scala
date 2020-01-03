@@ -31,7 +31,7 @@ object Kafka {
                                                           timer: Timer[F]): F[Unit] =
       (for {
         queue <- messageQueue
-        _ <- Stream.sleep_[F](5.seconds) concurrently streamWithQueue(broker, topic, users, queue).drain
+        _ <- streamWithQueue(broker, topic, users, queue).drain
       } yield ()).compile.drain
 
     def streamWithQueue[F[_], A: SchemaFor : ToRecord : FromRecord](broker: String, topic: String, users: Stream[F, A], queue: Queue[F, Option[A]])
@@ -47,16 +47,12 @@ object Kafka {
         users.through(queue.enqueue),
         queue.dequeue
           .unNoneTerminate
-          .evalMap(a =>
-            concurrentEffect.delay(ProducerRecords
-              .one(ProducerRecord(topic, "dummy-key", Avro.encode[A](a))))
-          ).covary[F]
+          .evalMap(a => concurrentEffect.delay(ProducerRecords.one(ProducerRecord(topic, "dummy-key", Avro.encode[A](a)))))
+          .covary[F]
           .through(publishToKafka)
           .flatMap(result => Stream.eval(
-            Logger[F].info(result.records
-              .map(record => Avro.decode[A](record._1.value))
-              .head
-              .fold("Error: ProducerResult contained empty records.")(a => s"Published $a")))
+            Logger[F].info(result.records.head.fold("Error: ProducerResult contained empty records.")(a => s"Published $a"))
+            ).flatMap(_ =>  Stream.eval(sync.delay(result)))
           )
       ).parJoin(2)
   }
