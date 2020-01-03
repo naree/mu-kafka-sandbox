@@ -11,7 +11,7 @@ object Producer extends IOApp {
     val messageQueue: Stream[IO, Queue[IO, Option[UserWithCountry]]] = Stream.eval(Queue.bounded[IO, Option[UserWithCountry]](1))
     val users: Stream[IO, UserWithCountry] = Stream(UserWithCountry("naree", 1, "singapore"))
 
-    Kafka.producer[IO, UserWithCountry](broker, topic, messageQueue, users).unsafeRunSync()
+//    foo.kafka.Producer[IO, UserWithCountry](broker, topic, messageQueue, users).unsafeRunSync()
     IO(ExitCode.Success)
   }
 }
