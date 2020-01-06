@@ -15,10 +15,7 @@ class UserV1Server(implicit timer: Timer[IO]) extends UserV1[IO] {
   implicit def unsafeLogger[F[_] : Sync] = Slf4jLogger.getLogger[F]
 
   def sendUser(user: foo.UserWithCountry): IO[UserWithCountry] = {
-    println(s"*********************************** $user ")
-
     for {
-      _ <- IO(println(s"Received $user"))
       _ <- Logger[IO].info(s"Received $user")
     } yield user
   }
@@ -29,16 +26,16 @@ object UserV1Server extends IOApp {
   def run(args: List[String]): IO[ExitCode] = {
 
     implicit val service: UserV1[IO] = new UserV1Server()
+    implicit def unsafeLogger[F[_] : Sync] = Slf4jLogger.getLogger[F]
 
     val run = for {
       grpcConfig <- UserV1.bindService[IO]
       server     <- GrpcServer.default[IO](8080, List(AddService(grpcConfig)))
-      _ <- IO(println("Starting the server"))
+      _ <- Logger[IO].info("Starting the server")
       runServer  <- GrpcServer.server[IO](server)
     } yield runServer
 
     run.unsafeRunSync()
     IO(ExitCode.Success)
   }
-
 }
