@@ -19,11 +19,9 @@ object UserV1Client extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
     Stream.resource(new UserV1RpcClient()
     .runClient[IO]())
-    .flatMap{ client => Stream.eval(client.sendUser(UserWithCountry("n", 1, "singa"))) }
+    .flatMap(client => Stream.eval(client.sendUser(UserWithCountry("n", 1, "singa"))))
     .compile
     .drain
     .as(ExitCode.Success)
-    .unsafeRunSync()
-    IO(ExitCode.Success)
   }
 }
