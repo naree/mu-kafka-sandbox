@@ -1,5 +1,6 @@
 package foo.main
 
+import cats.{Monad, MonadError}
 import cats.effect._
 import foo.main.Config.kafka.{broker, topic}
 import foo.{UserV1, UserWithCountry}
@@ -10,18 +11,17 @@ import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import cats.implicits._
 
-class UserV1Server(queue: Stream[IO, Queue[IO, Option[UserWithCountry]]])(implicit timer: Timer[IO]) extends UserV1[IO] {
+import scala.language.higherKinds
+
+class UserV1Server[F[_] : Logger : Monad](queue: Queue[F, Option[UserWithCountry]])(implicit timer: Timer[F]) extends UserV1[F] {
 
   implicit def unsafeLogger[F[_] : Sync] = Slf4jLogger.getLogger[F]
 
-  def sendUser(user: foo.UserWithCountry): IO[UserWithCountry] = {
-    val processUser = for {
-      _ <- Stream.eval(Logger[IO].info(s"Received $user"))
-      q <- queue
-      _ = q.enqueue1(Some(user))
+  def sendUser(user: foo.UserWithCountry): F[UserWithCountry] = {
+    for {
+      _ <- Logger[F].info(s"Received $user")
+      _ = queue.enqueue1(Some(user))
     } yield user
-
-    processUser.compile.lastOrError
   }
 }
 
@@ -29,16 +29,14 @@ object UserV1Server extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {
 
-    implicit def unsafeLogger[F[_] : Sync] = Slf4jLogger.getLogger[F]
-
-    val messageQueue: Stream[IO, Queue[IO, Option[UserWithCountry]]] = Stream.eval(Queue.bounded[IO, Option[UserWithCountry]](1))
-    implicit val service: UserV1[IO] = new UserV1Server(messageQueue)
+    implicit def unsafeLogger[F[_] : Sync] = Slf4jLogger.getLogger[F] // TODO make this purer?
 
     val run = for {
-      queue <- messageQueue
-      _ <- foo.kafka.Producer.streamWithQueue(broker, topic, queue)
-      grpcConfig <- Stream.eval(UserV1.bindService[IO])
-      server <- Stream.eval(GrpcServer.default[IO](8080, List(AddService(grpcConfig))))
+      queue <- Stream.eval(Queue.bounded[IO, Option[UserWithCountry]](1))
+      service = new UserV1Server(queue)
+//      _ <- foo.kafka.Producer.streamWithQueue(broker, topic, queue) // TODO use contextshifting?
+      grpcConfig <- Stream.eval(UserV1.bindService[IO](CE = implicitly[ConcurrentEffect[IO]], algebra = service))
+      server <- Stream.eval(GrpcServer.default[IO](8080, List(AddService(grpcConfig)))) // TODO clean shutdown?
       _ <- Stream.eval(Logger[IO].info("Starting the server"))
       runServer <- Stream.eval(GrpcServer.server[IO](server))
     } yield runServer
