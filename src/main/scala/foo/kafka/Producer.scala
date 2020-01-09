@@ -18,6 +18,7 @@ object Producer {
     ProducerSettings[F, String, Array[Byte]]
       .withBootstrapServers(broker)
 
+  type ByteArrayProducerResult = ProducerResult[String, Array[Byte], Unit]
   type PublishToKafka[F[_]] = Pipe[F, ProducerRecords[String, Array[Byte], Unit], ProducerResult[String, Array[Byte], Unit]]
 
   def pipe[F[_]](broker: String)(implicit contextShift: ContextShift[F],
@@ -35,20 +36,20 @@ object Producer {
 
   def streamWithQueue[F[_], A: SchemaFor : ToRecord : FromRecord]
   (broker: String, topic: String, queue: Queue[F, Option[A]])
-  (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F], timer: Timer[F], sync: Sync[F]): Stream[F, Any] =
-
+  (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F], timer: Timer[F], sync: Sync[F]): Stream[F, ByteArrayProducerResult] =
     streamWithQueue(pipe(broker))(topic, queue)
 
   def streamWithQueue[F[_], A: SchemaFor : ToRecord : FromRecord](publishToKafka: PublishToKafka[F])
-                                                                 (topic: String, queue: Queue[F, Option[A]])
-                                                                 (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F], timer: Timer[F], sync: Sync[F]): Stream[F, Any] =
+  (topic: String, queue: Queue[F, Option[A]])
+  (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F], timer: Timer[F], sync: Sync[F]): Stream[F, ByteArrayProducerResult] =
     queue.dequeue
       .unNoneTerminate
       .evalMap(a => concurrentEffect.delay(ProducerRecords.one(ProducerRecord(topic, "dummy-key", Avro.encode[A](a)))))
       .covary[F]
       .through(publishToKafka)
-      .flatMap(result => Stream.eval(
-        Logger[F].info(result.records.head.fold("Error: ProducerResult contained empty records.")(a => s"Published $a"))
-      ).flatMap(_ => Stream.eval(sync.delay(result)))
+      .flatMap(result =>
+        Stream.eval(
+          Logger[F].info(result.records.head.fold("Error: ProducerResult contained empty records.")(a => s"Published $a"))
+        ).flatMap(_ => Stream.eval(sync.delay(result)))
       )
 }
