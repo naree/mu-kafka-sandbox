@@ -31,13 +31,6 @@ class UserV1Server[F[_] : Logger : Monad](queue: Queue[F, Option[UserWithCountry
 
 object UserV1Server extends IOApp {
 
-  def blockingThreadPool[F[_]](implicit F: Sync[F]): Resource[F, ExecutionContext] =
-    Resource(F.delay {
-      val executor = Executors.newCachedThreadPool()
-      val ec = ExecutionContext.fromExecutor(executor)
-      (ec, F.delay(executor.shutdown()))
-  })
-
   def run(args: List[String]): IO[ExitCode] = {
 
     def startGrp[F[_]: Timer](queue: Queue[F, Option[UserWithCountry]])(implicit concurrentEffect: ConcurrentEffect[F]): Stream[F, Unit] = {
@@ -49,13 +42,9 @@ object UserV1Server extends IOApp {
       } yield runServer
     }
 
-    def startKafkaProducer(queue: Queue[IO, Option[UserWithCountry]]): Stream[IO, Unit] =
-      Stream.eval(blockingThreadPool[IO].use { ec =>
-        contextShift.evalOn(ec)(
-          Logger[IO].info("Starting the Kafka Producer")
-            .flatMap(_ => foo.kafka.Producer.streamWithQueue(broker, topic, queue).compile.drain)
-        )
-      })
+    def startKafkaProducer(queue: Queue[IO, Option[UserWithCountry]]): Stream[IO, foo.kafka.Producer.ByteArrayProducerResult] =
+      Stream.eval(Logger[IO].info("Starting the Kafka Producer"))
+        .flatMap(_ => foo.kafka.Producer.streamWithQueue(broker, topic, queue))
 
     implicit def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] = Slf4jLogger.getLogger[F] // TODO make this purer?
 
