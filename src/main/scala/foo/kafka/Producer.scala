@@ -43,6 +43,7 @@ object Producer {
   (topic: String, queue: Queue[F, Option[A]])
   (implicit contextShift: ContextShift[F], concurrentEffect: ConcurrentEffect[F], timer: Timer[F], sync: Sync[F]): Stream[F, ByteArrayProducerResult] =
     queue.dequeue
+      .flatMap(a => Stream.eval(Logger[F].info(s"Dequeued $a")).map(_ => a))
       .unNoneTerminate
       .evalMap(a => concurrentEffect.delay(ProducerRecords.one(ProducerRecord(topic, "dummy-key", Avro.encode[A](a)))))
       .covary[F]

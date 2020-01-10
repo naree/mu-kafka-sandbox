@@ -16,14 +16,14 @@ import cats.implicits._
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-class UserV1Server[F[_] : Logger : Monad](queue: Queue[F, Option[UserWithCountry]])(implicit timer: Timer[F]) extends UserV1[F] {
+class UserV1Server[F[_] : Monad: Sync](queue: Queue[F, Option[UserWithCountry]])(implicit timer: Timer[F]) extends UserV1[F] {
 
   implicit def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] = Slf4jLogger.getLogger[F]
 
   def sendUser(user: foo.UserWithCountry): F[UserWithCountry] = {
     for {
       _ <- Logger[F].info(s"Received $user")
-      _ = queue.enqueue1(Some(user))
+      _ <- queue.enqueue(Stream.eval(implicitly[Sync[F]].delay(Some(user)))).compile.drain
       _ <- Logger[F].info(s"Queued $user to be sent to test-topic")
     } yield user
   }
