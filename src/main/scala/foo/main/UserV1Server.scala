@@ -12,6 +12,7 @@ import higherkindness.mu.rpc.server.{AddService, GrpcServer}
 import io.chrisdavenport.log4cats.{Logger, SelfAwareStructuredLogger}
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import cats.implicits._
+import com.sksamuel.avro4s.{FromRecord, SchemaFor, ToRecord}
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -42,8 +43,9 @@ object UserV1Server extends IOApp {
       } yield runServer
     }
 
-    def startKafkaProducer(queue: Queue[IO, Option[UserWithCountry]]): Stream[IO, foo.kafka.Producer.ByteArrayProducerResult] =
-      Stream.eval(Logger[IO].info("Starting the Kafka Producer"))
+    def startKafkaProducer[F[_]: ConcurrentEffect: ContextShift: Timer, A : SchemaFor: ToRecord: FromRecord](queue: Queue[F, Option[A]]): Stream[F, foo.kafka.Producer.ByteArrayProducerResult] =
+      Stream
+        .eval(Logger[F].info("Starting the Kafka Producer"))
         .flatMap(_ => foo.kafka.Producer.streamWithQueue(broker, topic, queue))
 
     implicit def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] = Slf4jLogger.getLogger[F] // TODO make this purer?
