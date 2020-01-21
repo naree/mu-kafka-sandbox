@@ -23,3 +23,5 @@ sourceGenerators in Compile += (srcGen in Compile).taskValue
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.patch)
 
 enablePlugins(JavaAppPackaging)
+
+addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")

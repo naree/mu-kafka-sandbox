@@ -13,20 +13,18 @@ import scala.language.higherKinds
 
 object Consumer {
 
-  implicit def unsafeLogger[F[_] : Sync] = Slf4jLogger.getLogger[F]
-
   def settings[F[_]](groupId: String, broker: String)(implicit sync: Sync[F]): ConsumerSettings[F, String, Array[Byte]] =
     ConsumerSettings[F, String, Array[Byte]]
       .withGroupId(groupId)
       .withBootstrapServers(broker)
       .withAutoOffsetReset(AutoOffsetReset.Latest)
 
-  def apply[F[_], A: SchemaFor : FromRecord](groupId: String, topic: String, broker: String)
+  def apply[F[_]: Logger, A: SchemaFor : FromRecord](groupId: String, topic: String, broker: String)
                                             (implicit contextShift: ContextShift[F],
                                              concurrentEffect: ConcurrentEffect[F], timer: Timer[F]): F[Unit] =
     stream(groupId, topic, broker).compile.drain
 
-  def stream[F[_], A: SchemaFor : FromRecord](groupId: String, topic: String, broker: String)
+  def stream[F[_]: Logger, A: SchemaFor : FromRecord](groupId: String, topic: String, broker: String)
                                              (implicit contextShift: ContextShift[F],
                                               concurrentEffect: ConcurrentEffect[F], timer: Timer[F]): Stream[F, A] =
     consumerStream(settings(groupId, broker))
