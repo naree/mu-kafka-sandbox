@@ -37,18 +37,19 @@ object UserV1Server extends IOApp {
     def startGrp[F[_]: Timer](queue: Queue[F, Option[UserWithCountry]])(implicit concurrentEffect: ConcurrentEffect[F]): Stream[F, Unit] = {
       for {
         grpcConfig <- Stream.eval(UserV1.bindService[F](CE = concurrentEffect, algebra = new UserV1Server(queue)))
-        server <- Stream.eval(GrpcServer.default[F](8080, List(AddService(grpcConfig)))) // TODO clean shutdown?
+        server <- Stream.eval(GrpcServer.default[F](8080, List(AddService(grpcConfig))))
         _ <- Stream.eval(Logger[F].info("Starting the server"))
         runServer <- Stream.eval(GrpcServer.server[F](server))
       } yield runServer
     }
 
-    def startKafkaProducer[F[_]: ConcurrentEffect: ContextShift: Timer, A : SchemaFor: ToRecord: FromRecord](queue: Queue[F, Option[A]]): Stream[F, foo.kafka.Producer.ByteArrayProducerResult] =
+    def startKafkaProducer[F[_]: ConcurrentEffect: ContextShift: Timer, A : SchemaFor: ToRecord: FromRecord]
+    (queue: Queue[F, Option[A]]): Stream[F, foo.kafka.Producer.ByteArrayProducerResult] =
       Stream
         .eval(Logger[F].info("Starting the Kafka Producer"))
         .flatMap(_ => foo.kafka.Producer.streamWithQueue(broker, topic, queue))
 
-    implicit def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] = Slf4jLogger.getLogger[F] // TODO make this purer?
+    implicit def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] = Slf4jLogger.getLogger[F]
 
     val run = for {
       queue <- Stream.eval(Queue.bounded[IO, Option[UserWithCountry]](1))
