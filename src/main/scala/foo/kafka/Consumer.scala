@@ -3,6 +3,7 @@ package foo.kafka
 import cats.effect._
 import com.sksamuel.avro4s.{FromRecord, SchemaFor, ToRecord}
 import foo.Avro
+import foo.codec.Decoder
 import fs2._
 import fs2.concurrent.Queue
 import fs2.kafka._
@@ -19,20 +20,20 @@ object Consumer {
       .withBootstrapServers(broker)
       .withAutoOffsetReset(AutoOffsetReset.Latest)
 
-  def apply[F[_]: Logger, A: SchemaFor : FromRecord](groupId: String, topic: String, broker: String)
-                                            (implicit contextShift: ContextShift[F],
-                                             concurrentEffect: ConcurrentEffect[F], timer: Timer[F]): F[Unit] =
+  def apply[F[_]: Logger, A](groupId: String, topic: String, broker: String)
+                         (implicit contextShift: ContextShift[F],
+                         concurrentEffect: ConcurrentEffect[F], timer: Timer[F], decoder: Decoder[A]): F[Unit] =
     stream(groupId, topic, broker).compile.drain
 
-  def stream[F[_]: Logger, A: SchemaFor : FromRecord](groupId: String, topic: String, broker: String)
-                                             (implicit contextShift: ContextShift[F],
-                                              concurrentEffect: ConcurrentEffect[F], timer: Timer[F]): Stream[F, A] =
+  def stream[F[_]: Logger, A](groupId: String, topic: String, broker: String)
+                             (implicit contextShift: ContextShift[F],
+                             concurrentEffect: ConcurrentEffect[F], timer: Timer[F], decoder: Decoder[A]): Stream[F, A] =
     consumerStream(settings(groupId, broker))
       .evalTap(_.subscribeTo(topic))
       .flatMap {
         _.stream
           .flatMap { message =>
-            val a = Avro.decode[A](message.record.value)
+            val a = decoder.decode(message.record.value)
             Stream.eval(Logger[F].info(a.toString)).map(_ => a)
           }
       }

@@ -10,6 +10,7 @@ object Consumer extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
     import Config.kafka._
     val consumerGroup = "test-consumer-group"
+    import AvroDecoderForUserWithRegion._
 
     val program = for {
       implicit0(logger: Logger[IO]) <- Slf4jLogger.create[IO]
