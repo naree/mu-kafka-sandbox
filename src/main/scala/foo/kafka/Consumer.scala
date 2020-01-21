@@ -1,14 +1,10 @@
 package foo.kafka
 
 import cats.effect._
-import com.sksamuel.avro4s.{FromRecord, SchemaFor, ToRecord}
-import foo.Avro
 import foo.codec.Decoder
 import fs2._
-import fs2.concurrent.Queue
 import fs2.kafka._
 import io.chrisdavenport.log4cats.Logger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 
 import scala.language.higherKinds
 
