@@ -28,13 +28,14 @@ object Consumer {
 
   def stream[F[_], A: SchemaFor : FromRecord](groupId: String, topic: String, broker: String)
                                              (implicit contextShift: ContextShift[F],
-                                              concurrentEffect: ConcurrentEffect[F], timer: Timer[F]): Stream[F, Unit] =
+                                              concurrentEffect: ConcurrentEffect[F], timer: Timer[F]): Stream[F, A] =
     consumerStream(settings(groupId, broker))
       .evalTap(_.subscribeTo(topic))
       .flatMap {
         _.stream
-          .flatMap(message => Stream.eval(
-            Logger[F].info(Avro.decode[A](message.record.value).toString)
-          ))
+          .flatMap { message =>
+            val a = Avro.decode[A](message.record.value)
+            Stream.eval(Logger[F].info(a.toString)).map(_ => a)
+          }
       }
 }
