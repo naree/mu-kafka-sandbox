@@ -1,20 +1,17 @@
 package foo.main
 
-import java.util.concurrent.Executors
-
-import cats.{Monad, MonadError}
+import cats.Monad
 import cats.effect._
-import foo.main.Config.kafka.{broker, topic}
+import cats.implicits._
+import com.sksamuel.avro4s.{FromRecord, SchemaFor, ToRecord}
 import foo.{UserV1, UserWithCountry}
 import fs2._
 import fs2.concurrent.Queue
+import higherkindness.mu.kafka._
 import higherkindness.mu.rpc.server.{AddService, GrpcServer}
-import io.chrisdavenport.log4cats.{Logger, SelfAwareStructuredLogger}
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
-import cats.implicits._
-import com.sksamuel.avro4s.{FromRecord, SchemaFor, ToRecord}
+import io.chrisdavenport.log4cats.{Logger, SelfAwareStructuredLogger}
 
-import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 class UserV1Server[F[_] : Monad: Sync](queue: Queue[F, Option[UserWithCountry]])(implicit timer: Timer[F]) extends UserV1[F] {
@@ -34,6 +31,8 @@ object UserV1Server extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {
 
+    import SandboxConfig.kafka._
+
     def startGrp[F[_]: Timer](queue: Queue[F, Option[UserWithCountry]])(implicit concurrentEffect: ConcurrentEffect[F]): Stream[F, Unit] = {
       for {
         grpcConfig <- Stream.eval(UserV1.bindService[F](CE = concurrentEffect, algebra = new UserV1Server(queue)))
@@ -43,11 +42,13 @@ object UserV1Server extends IOApp {
       } yield runServer
     }
 
-    def startKafkaProducer[F[_]: ConcurrentEffect: ContextShift: Timer, A : SchemaFor: ToRecord: FromRecord]
-    (queue: Queue[F, Option[A]]): Stream[F, foo.kafka.Producer.ByteArrayProducerResult] =
+    import higherkindness.mu.format.AvroWithSchema._
+
+    def startKafkaProducer[F[_]: ConcurrentEffect: ContextShift: Timer, A: SchemaFor: ToRecord: FromRecord]
+    (queue: Queue[F, Option[A]]): Stream[F, ByteArrayProducerResult] =
       Stream
         .eval(Logger[F].info("Starting the Kafka Producer"))
-        .flatMap(_ => foo.kafka.Producer.streamWithQueue(broker, topic, queue))
+        .flatMap(_ => ProducerStream(topic, queue, producerSettings(brokers)))
 
     implicit def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] = Slf4jLogger.getLogger[F]
 

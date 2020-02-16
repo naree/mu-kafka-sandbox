@@ -2,24 +2,17 @@ package foo.main
 
 import cats.effect._
 import foo._
-import fs2.concurrent.Queue
-import foo.main.Config.kafka.{broker, topic}
 import fs2.Stream
+import higherkindness.mu.kafka._
 
 object Producer extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
-    val messageQueue: Stream[IO, Queue[IO, Option[UserWithCountry]]] = Stream.eval(Queue.bounded[IO, Option[UserWithCountry]](1))
+    import SandboxConfig.kafka._
+    import higherkindness.mu.format.AvroWithSchema._
+
     val users: Stream[IO, Option[UserWithCountry]] = Stream(Some(UserWithCountry("naree", 1, "singapore")))
+    producer(topic, users).unsafeRunSync()
 
-    val producer = for {
-      queue <- messageQueue
-      result <- Stream(
-        users.through(queue.enqueue),
-        foo.kafka.Producer.streamWithQueue(broker, topic, queue))
-        .parJoin(2)
-    } yield result
-
-    producer.compile.drain.unsafeRunSync()
     IO(ExitCode.Success)
   }
 }
